@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QSR & Fast‑Casual Competitor Dashboard</title>
+  <!-- Load React and other libs from CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Babel for in‑browser JSX compilation -->
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <div id="root" class="container mx-auto p-4"></div>
+  <script type="text/babel">
+    /***
+     * Quick & simple QSR dashboard.
+     * This file is completely self‑contained – just open in any modern browser.
+     * It uses React 18, Recharts and TailwindCSS via their CDNs.
+     */
+
+    // A small sample of public QSR/Fast‑casual operators and their latest metrics.
+    const SEED = [
+      { company: "McDonald's", ticker: "MCD", segment: "Burger", region: "Global", sss_pct_latest: 3.8, units: 44000 },
+      { company: "Yum! Brands", ticker: "YUM", segment: "Multi‑brand", region: "Global", sss_pct_latest: 2.0, units: 60893 },
+      { company: "Restaurant Brands Intl.", ticker: "QSR", segment: "Multi‑brand", region: "Global", sss_pct_latest: 2.4, units: 32229 },
+      { company: "Chipotle", ticker: "CMG", segment: "Mexican", region: "US", sss_pct_latest: -4.0, units: 3500 },
+      { company: "Starbucks", ticker: "SBUX", segment: "Coffee", region: "Global", sss_pct_latest: -2.0, units: 41097 },
+      { company: "Wingstop", ticker: "WING", segment: "Chicken", region: "Global", sss_pct_latest: -1.9, units: 2818 },
+      { company: "Wendy's", ticker: "WEN", segment: "Burger", region: "Global", sss_pct_latest: -2.9, units: 7334 },
+      { company: "Domino's Pizza", ticker: "DPZ", segment: "Pizza", region: "Global", sss_pct_latest: 3.4, units: 20000 },
+      { company: "Papa John's", ticker: "PZZA", segment: "Pizza", region: "Global", sss_pct_latest: 4.0, units: 5700 },
+      { company: "Shake Shack", ticker: "SHAK", segment: "Burger", region: "US", sss_pct_latest: 1.8, units: 524 },
+      { company: "Cava", ticker: "CAVA", segment: "Mediterranean", region: "US", sss_pct_latest: 2.1, units: 398 },
+      { company: "Krispy Kreme", ticker: "DNUT", segment: "Snack", region: "Global", sss_pct_latest: 0.0, units: 1820 },
+      { company: "Dutch Bros", ticker: "BROS", segment: "Coffee", region: "US", sss_pct_latest: 6.1, units: 1043 },
+      { company: "Portillo's", ticker: "PTLO", segment: "Fast‑Casual", region: "US", sss_pct_latest: 0.7, units: 85 },
+      { company: "Sweetgreen", ticker: "SG", segment: "Salad", region: "US", sss_pct_latest: -7.6, units: 220 },
+      { company: "Kura Sushi USA", ticker: "KRUS", segment: "Sushi", region: "US", sss_pct_latest: -2.1, units: 60 },
+      { company: "El Pollo Loco", ticker: "LOCO", segment: "Chicken", region: "US", sss_pct_latest: -0.3, units: 495 },
+      { company: "Noodles & Co", ticker: "NDLS", segment: "Pasta", region: "US", sss_pct_latest: 1.5, units: 450 },
+      { company: "Mixue Group", ticker: "2097.HK", segment: "Tea & Ice Cream", region: "China", sss_pct_latest: 0.0, units: 45302 },
+    ];
+
+    /** Debounce hook to avoid filtering on every keystroke. */
+    function useDebounced(value, delay = 200) {
+      const [debounced, setDebounced] = React.useState(value);
+      React.useEffect(() => {
+        const id = setTimeout(() => setDebounced(value), delay);
+        return () => clearTimeout(id);
+      }, [value, delay]);
+      return debounced;
+    }
+
+    function Dashboard() {
+      // Search term and selected companies.
+      const [query, setQuery] = React.useState("");
+      const [selected, setSelected] = React.useState([]);
+      const debouncedQuery = useDebounced(query);
+      // Unique list of companies for filter chips.
+      const companies = React.useMemo(
+        () => Array.from(new Set(SEED.map((d) => d.company))),
+        []
+      );
+      // Toggle a company in the selected array.
+      const toggle = (company) => {
+        setSelected((prev) =>
+          prev.includes(company)
+            ? prev.filter((c) => c !== company)
+            : [...prev, company]
+        );
+      };
+      // Filtered dataset based on chips and search.
+      const filtered = React.useMemo(() => {
+        return SEED.filter((row) => {
+          const matchesCompany =
+            selected.length === 0 || selected.includes(row.company);
+          const q = debouncedQuery.toLowerCase();
+          const matchesQuery =
+            !q ||
+            row.company.toLowerCase().includes(q) ||
+            row.ticker.toLowerCase().includes(q) ||
+            row.segment.toLowerCase().includes(q) ||
+            row.region.toLowerCase().includes(q);
+          return matchesCompany && matchesQuery;
+        });
+      }, [selected, debouncedQuery]);
+      // Prepare bar chart data.
+      const sssData = React.useMemo(
+        () => filtered.map((d) => ({ name: d.company, sss: d.sss_pct_latest })),
+        [filtered]
+      );
+      const unitsData = React.useMemo(
+        () => filtered.map((d) => ({ name: d.company, units: d.units })),
+        [filtered]
+      );
+      return (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-indigo-50 via-sky-50 to-emerald-50 p-6 rounded-xl shadow-sm">
+            <h1 className="text-2xl font-bold text-gray-800">
+              QSR &amp; Fast‑Casual Competitor Dashboard
+            </h1>
+            <p className="text-sm text-gray-600">
+              Explore a snapshot of the latest same‑store sales (SSS) and unit counts
+              for major publicly traded quick‑service and fast‑casual operators.
+            </p>
+          </div>
+          {/* Filter chips */}
+          <div className="flex flex-wrap gap-2">
+            {companies.map((comp) => (
+              <button
+                key={comp}
+                onClick={() => toggle(comp)}
+                className={
+                  "px-3 py-1 text-sm rounded-full border " +
+                  (selected.includes(comp)
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100")
+                }
+              >
+                {comp}
+              </button>
+            ))}
+          </div>
+          {/* Search */}
+          <div>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search companies, tickers, segments, regions..."
+              className="w-full md:w-1/2 border border-gray-300 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          {/* Data table */}
+          <div className="overflow-x-auto bg-white rounded-lg shadow">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Company
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Ticker
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Segment
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Region
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    SSS %
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Units
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filtered.map((row) => (
+                  <tr key={row.company}>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {row.company}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                      {row.ticker}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                      {row.segment}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                      {row.region}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-500">
+                      {row.sss_pct_latest.toFixed(1)}%
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-500">
+                      {row.units.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filtered.length === 0 && (
+              <div className="p-4 text-sm text-gray-500">No results found.</div>
+            )}
+          </div>
+          {/* Charts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-4 rounded-lg shadow">
+              <h2 className="text-base font-semibold mb-2">
+                Latest Same‑Store Sales (%)
+              </h2>
+              <Recharts.ResponsiveContainer width="100%" height={300}>
+                <Recharts.BarChart data={sssData}>
+                  <Recharts.CartesianGrid strokeDasharray="3 3" />
+                  <Recharts.XAxis
+                    dataKey="name"
+                    interval={0}
+                    tick={{ fontSize: 10 }}
+                    angle={-45}
+                    textAnchor="end"
+                  />
+                  <Recharts.YAxis />
+                  <Recharts.Tooltip />
+                  <Recharts.Bar
+                    dataKey="sss"
+                    fill="#6366F1"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </Recharts.BarChart>
+              </Recharts.ResponsiveContainer>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow">
+              <h2 className="text-base font-semibold mb-2">Store Counts</h2>
+              <Recharts.ResponsiveContainer width="100%" height={300}>
+                <Recharts.BarChart data={unitsData}>
+                  <Recharts.CartesianGrid strokeDasharray="3 3" />
+                  <Recharts.XAxis
+                    dataKey="name"
+                    interval={0}
+                    tick={{ fontSize: 10 }}
+                    angle={-45}
+                    textAnchor="end"
+                  />
+                  <Recharts.YAxis />
+                  <Recharts.Tooltip />
+                  <Recharts.Bar
+                    dataKey="units"
+                    fill="#059669"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </Recharts.BarChart>
+              </Recharts.ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Render the dashboard into the root element.
+    ReactDOM.render(<Dashboard />, document.getElementById("root"));
+  </script>
+</body>
+</html>
